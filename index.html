@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Log Analyzer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0f12;
+  --surface:#13161b;
+  --surface2:#1a1e25;
+  --border:#252930;
+  --border2:#2e343d;
+  --text:#e8eaf0;
+  --muted:#7a8194;
+  --faint:#3d4455;
+  --red:#f04545;
+  --red-dim:#2a1414;
+  --amber:#f59e0b;
+  --amber-dim:#2a200a;
+  --green:#22c55e;
+  --green-dim:#0d2017;
+  --blue:#60a5fa;
+  --blue-dim:#0f1e30;
+  --mono:'JetBrains Mono',monospace;
+  --sans:'Syne',sans-serif;
+  --r:8px;
+  --r2:12px;
+}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+
+/* ── Layout ── */
+header{padding:1.25rem 2rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+main{flex:1;padding:1.75rem 2rem;max-width:1300px;width:100%;margin:0 auto}
+footer{padding:.75rem 2rem;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:11px;font-family:var(--mono);color:var(--muted)}
+
+/* ── Header ── */
+.logo{display:flex;align-items:center;gap:12px}
+.logo-mark{width:36px;height:36px;background:var(--red);border-radius:var(--r);display:grid;place-items:center;flex-shrink:0}
+.logo-mark svg{width:20px;height:20px;fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.logo-name{font-size:18px;font-weight:700;letter-spacing:-.4px}
+.logo-sub{font-size:11px;font-family:var(--mono);color:var(--muted);margin-top:1px}
+.status-pill{display:flex;align-items:center;gap:7px;font-size:11px;font-family:var(--mono);color:var(--muted);border:1px solid var(--border2);padding:5px 12px;border-radius:20px}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--muted)}
+.dot.live{background:var(--green);animation:blink 2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── Upload zone ── */
+.upload-zone{border:1px dashed var(--border2);border-radius:var(--r2);padding:2rem;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:1.5rem;position:relative}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--blue);background:var(--blue-dim)}
+.upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upload-icon{font-size:28px;margin-bottom:.5rem}
+.upload-title{font-size:14px;font-weight:600;margin-bottom:.25rem}
+.upload-hint{font-size:12px;color:var(--muted);font-family:var(--mono)}
+.paste-area{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.75rem 1rem;color:var(--text);font-family:var(--mono);font-size:12px;resize:vertical;min-height:90px;outline:none;transition:border .2s;margin-bottom:.75rem}
+.paste-area:focus{border-color:var(--blue)}
+.paste-area::placeholder{color:var(--faint)}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:var(--r);font-size:13px;font-family:var(--sans);font-weight:600;cursor:pointer;border:1px solid transparent;transition:all .18s}
+.btn-primary{background:var(--red);color:#fff;border-color:var(--red)}
+.btn-primary:hover{opacity:.85}
+.btn-ghost{background:transparent;color:var(--muted);border-color:var(--border2)}
+.btn-ghost:hover{color:var(--text);border-color:var(--faint)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ── Stats row ── */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:1.25rem}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.9rem 1rem}
+.stat-label{font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
+.stat-val{font-size:24px;font-weight:700;font-family:var(--mono);line-height:1}
+.stat-val.red{color:var(--red)}
+.stat-val.amber{color:var(--amber)}
+.stat-val.green{color:var(--green)}
+.stat-val.blue{color:var(--blue)}
+
+/* ── Panels ── */
+.panels{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:1.25rem}
+@media(max-width:700px){.panels{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:.75rem 1.1rem;border-bottom:1px solid var(--border)}
+.panel-title{font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px}
+.panel-badge{font-size:10px;font-family:var(--mono);background:var(--surface2);color:var(--muted);padding:2px 8px;border-radius:20px;border:1px solid var(--border2)}
+
+/* ── Alert items ── */
+.alert-list{padding:.4rem .6rem}
+.alert-item{padding:.6rem .5rem;border-radius:var(--r);cursor:default;display:flex;flex-direction:column;gap:4px;border-bottom:1px solid var(--border);transition:background .15s}
+.alert-item:last-child{border-bottom:none}
+.alert-item:hover{background:var(--surface2)}
+.alert-top{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.ip{font-size:12px;font-family:var(--mono);font-weight:600;color:var(--text)}
+.tag{font-size:9px;font-family:var(--mono);padding:2px 6px;border-radius:4px;font-weight:600;text-transform:uppercase}
+.tag-crit{background:#3d1010;color:#f87171;border:1px solid #5a1818}
+.tag-high{background:var(--amber-dim);color:#fbbf24;border:1px solid #4a3010}
+.tag-med{background:#1f2008;color:#bef264;border:1px solid #364010}
+.tag-ext{background:var(--blue-dim);color:var(--blue);border:1px solid #1a3050}
+.tag-warn{background:var(--amber-dim);color:#fbbf24;border:1px solid #4a3010}
+.tag-ok{background:var(--green-dim);color:var(--green);border:1px solid #0d3020}
+.alert-meta{font-size:11px;font-family:var(--mono);color:var(--muted)}
+.bar-wrap{height:3px;background:var(--border2);border-radius:2px;overflow:hidden;margin-top:3px}
+.bar{height:100%;border-radius:2px;transition:width .7s ease}
+.bar.crit{background:var(--red)}
+.bar.high{background:var(--amber)}
+.bar.med{background:#bef264}
+
+/* ── Log table ── */
+.log-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);overflow:hidden;margin-bottom:1.25rem}
+.log-toolbar{display:flex;align-items:center;gap:6px;padding:.6rem 1rem;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.filter-btn{font-size:11px;font-family:var(--mono);padding:3px 10px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s}
+.filter-btn.active{background:var(--text);color:var(--bg);border-color:var(--text)}
+.log-wrap{max-height:240px;overflow-y:auto}
+.log-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px}
+.log-table thead th{position:sticky;top:0;background:var(--surface);padding:.45rem .85rem;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:1px solid var(--border);font-weight:500}
+.log-table tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+.log-table tbody tr:last-child{border-bottom:none}
+.log-table tbody tr:hover{background:var(--surface2)}
+.log-table td{padding:.4rem .85rem;color:var(--muted)}
+.log-table .td-ts{color:var(--faint)}
+.log-table .td-ip{color:var(--blue);font-weight:500}
+.log-table .td-user{color:#a78bfa}
+.log-table .td-fail{color:var(--red);font-weight:600}
+.log-table .td-ok{color:var(--green);font-weight:600}
+.log-table .td-ext{font-size:9px;color:var(--blue);background:var(--blue-dim);padding:1px 5px;border-radius:3px;border:1px solid #1a3050}
+
+/* ── Empty / Loading states ── */
+.empty{padding:3rem;text-align:center;color:var(--muted);font-size:13px}
+.empty .empty-icon{font-size:32px;margin-bottom:.75rem}
+.loading{display:flex;align-items:center;justify-content:center;gap:10px;padding:2.5rem;color:var(--muted);font-size:13px;font-family:var(--mono)}
+.spinner{width:18px;height:18px;border:2px solid var(--border2);border-top-color:var(--red);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.error-msg{background:var(--red-dim);border:1px solid #5a1818;color:#f87171;padding:.7rem 1rem;border-radius:var(--r);font-size:12px;font-family:var(--mono);margin-bottom:1rem}
+
+/* ── Dashboard wrapper ── */
+#dashboard{display:none}
+#upload-section{margin-bottom:1.5rem}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--faint);border-radius:4px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    </div>
+    <div>
+      <div class="logo-name">Log Analyzer</div>
+      <div class="logo-sub">Suspicious activity detector</div>
+    </div>
+  </div>
+  <div class="status-pill">
+    <span class="dot" id="statusDot"></span>
+    <span id="statusText">Ready</span>
+  </div>
+</header>
+
+<main>
+  <!-- Upload / Paste Section -->
+  <div id="upload-section">
+    <div class="upload-zone" id="dropZone">
+      <input type="file" id="fileInput" accept=".log,.txt,text/plain"/>
+      <div class="upload-icon">📂</div>
+      <div class="upload-title">Drop a log file here</div>
+      <div class="upload-hint">auth.log, syslog, access.log — any text log</div>
+    </div>
+
+    <div style="text-align:center;font-size:12px;color:var(--muted);font-family:var(--mono);margin:.75rem 0">— or paste log text —</div>
+
+    <textarea class="paste-area" id="pasteArea" placeholder="Jan 10 08:12:01 server sshd[1234]: Failed password for root from 192.168.1.105 port 22 ssh2&#10;..."></textarea>
+
+    <div id="errorMsg" class="error-msg" style="display:none"></div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="analyzeBtn" onclick="analyzeText()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Analyze Logs
+      </button>
+      <button class="btn btn-ghost" onclick="loadSample()">Load Sample Data</button>
+      <button class="btn btn-ghost" id="clearBtn" onclick="clearAll()" style="display:none">Clear</button>
+    </div>
+  </div>
+
+  <!-- Dashboard (shown after analysis) -->
+  <div id="dashboard">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:8px">
+      <div style="font-size:12px;font-family:var(--mono);color:var(--muted)" id="analyzedAt"></div>
+      <button class="btn btn-ghost" onclick="clearAll()" style="font-size:12px">↩ New Analysis</button>
+    </div>
+
+    <div class="stats-row" id="statsRow"></div>
+
+    <div class="panels">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Brute-force Attempts
+          </div>
+          <span class="panel-badge" id="bruteCount">—</span>
+        </div>
+        <div class="alert-list" id="bruteList">
+          <div class="empty"><div class="empty-icon">🛡️</div>No brute-force attacks detected</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            Unusual External IPs
+          </div>
+          <span class="panel-badge" id="unusualCount">—</span>
+        </div>
+        <div class="alert-list" id="unusualList">
+          <div class="empty"><div class="empty-icon">✅</div>No unusual IPs detected</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="log-panel">
+      <div class="log-toolbar">
+        <span style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-right:4px">Filter:</span>
+        <button class="filter-btn active" onclick="filterLogs('all',this)">All</button>
+        <button class="filter-btn" onclick="filterLogs('failed',this)">Failed</button>
+        <button class="filter-btn" onclick="filterLogs('success',this)">Success</button>
+        <button class="filter-btn" onclick="filterLogs('external',this)">External IPs</button>
+        <span style="margin-left:auto;font-size:11px;font-family:var(--mono);color:var(--muted)" id="logCount"></span>
+      </div>
+      <div class="log-wrap">
+        <table class="log-table">
+          <thead><tr>
+            <th>Timestamp</th><th>IP Address</th><th>User</th><th>Status</th><th>Scope</th>
+          </tr></thead>
+          <tbody id="logBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <span>Log Analyzer · Python + Flask backend</span>
+  <span id="footerTime"></span>
+</footer>
+
+<script>
+let allLogs = [];
+let currentFilter = 'all';
+
+// ── Drag and drop ─────────────────────────────────────────────────────────────
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) uploadFile(file);
+});
+document.getElementById('fileInput').addEventListener('change', e => {
+  if (e.target.files[0]) uploadFile(e.target.files[0]);
+});
+
+// ── Upload file ───────────────────────────────────────────────────────────────
+async function uploadFile(file) {
+  setLoading(true);
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const res = await fetch('/api/analyze/upload', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.error) showError(data.error);
+    else renderDashboard(data);
+  } catch(e) { showError('Failed to connect to backend.'); }
+  setLoading(false);
+}
+
+// ── Paste / text analysis ─────────────────────────────────────────────────────
+async function analyzeText() {
+  const text = document.getElementById('pasteArea').value.trim();
+  if (!text) { loadSample(); return; }
+  setLoading(true);
+  try {
+    const res = await fetch('/api/analyze/text', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+    if (data.error) showError(data.error);
+    else renderDashboard(data);
+  } catch(e) { showError('Failed to connect to backend.'); }
+  setLoading(false);
+}
+
+// ── Sample data ───────────────────────────────────────────────────────────────
+async function loadSample() {
+  setLoading(true);
+  try {
+    const res = await fetch('/api/analyze/sample');
+    const data = await res.json();
+    renderDashboard(data);
+  } catch(e) { showError('Backend not reachable.'); }
+  setLoading(false);
+}
+
+// ── Render dashboard ──────────────────────────────────────────────────────────
+function renderDashboard(data) {
+  hideError();
+  allLogs = data.logs || [];
+  const s = data.summary;
+
+  document.getElementById('analyzedAt').textContent = `Analyzed at ${data.analyzed_at}`;
+  document.getElementById('footerTime').textContent = data.analyzed_at;
+
+  // Status pill
+  document.getElementById('statusDot').className = 'dot live';
+  document.getElementById('statusText').textContent = 'Analysis complete';
+
+  // Stats
+  document.getElementById('statsRow').innerHTML = [
+    { label: 'Log entries', val: s.total_lines,       cls: 'blue' },
+    { label: 'Failed logins', val: s.total_failed,    cls: 'red'   },
+    { label: 'Successful',    val: s.total_success,   cls: 'green' },
+    { label: 'Unique IPs',    val: s.unique_ips,      cls: ''      },
+    { label: 'Brute-force',   val: s.brute_force_count, cls: s.brute_force_count > 0 ? 'red' : 'green' },
+    { label: 'Unusual IPs',   val: s.unusual_ip_count,  cls: s.unusual_ip_count > 0 ? 'amber' : 'green' },
+  ].map(c => `
+    <div class="stat">
+      <div class="stat-label">${c.label}</div>
+      <div class="stat-val ${c.cls}">${c.val}</div>
+    </div>`).join('');
+
+  // Brute force alerts
+  const bf = data.brute_force_alerts || [];
+  document.getElementById('bruteCount').textContent = bf.length + ' alert' + (bf.length !== 1 ? 's' : '');
+  const maxBF = bf[0]?.count || 1;
+  document.getElementById('bruteList').innerHTML = bf.length ? bf.map(a => {
+    const barClass = a.severity === 'CRITICAL' ? 'crit' : a.severity === 'HIGH' ? 'high' : 'med';
+    const tagClass = a.severity === 'CRITICAL' ? 'tag-crit' : a.severity === 'HIGH' ? 'tag-high' : 'tag-med';
+    const pct = Math.round((a.count / maxBF) * 100);
+    return `<div class="alert-item">
+      <div class="alert-top">
+        <span class="ip">${a.ip}</span>
+        <span class="tag ${tagClass}">${a.severity}</span>
+        ${a.external ? '<span class="tag tag-ext">external</span>' : ''}
+      </div>
+      <div class="alert-meta">${a.count} failed attempts · users: ${a.users.join(', ')}</div>
+      <div class="bar-wrap"><div class="bar ${barClass}" style="width:${pct}%"></div></div>
+    </div>`;
+  }).join('') : '<div class="empty"><div class="empty-icon">🛡️</div>No brute-force attacks detected</div>';
+
+  // Unusual IPs
+  const ui = data.unusual_ip_alerts || [];
+  document.getElementById('unusualCount').textContent = ui.length + ' IP' + (ui.length !== 1 ? 's' : '');
+  document.getElementById('unusualList').innerHTML = ui.length ? ui.map(u => `
+    <div class="alert-item">
+      <div class="alert-top">
+        <span class="ip">${u.ip}</span>
+        ${u.warning ? '<span class="tag tag-warn">⚠ successful login</span>' : ''}
+      </div>
+      <div class="alert-meta">${u.failed} failed · ${u.success} success · users: ${u.users.join(', ')}</div>
+    </div>`).join('') : '<div class="empty"><div class="empty-icon">✅</div>No unusual IPs detected</div>';
+
+  // Show dashboard
+  document.getElementById('upload-section').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('clearBtn').style.display = 'inline-flex';
+
+  renderLogs();
+}
+
+// ── Log table ─────────────────────────────────────────────────────────────────
+function filterLogs(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderLogs();
+}
+
+function renderLogs() {
+  const filtered = allLogs.filter(l => {
+    if (currentFilter === 'failed')   return l.status === 'failed';
+    if (currentFilter === 'success')  return l.status === 'success';
+    if (currentFilter === 'external') return l.external;
+    return true;
+  });
+  document.getElementById('logCount').textContent = filtered.length + ' entries';
+  document.getElementById('logBody').innerHTML = filtered.map(l => `
+    <tr>
+      <td class="td-ts">${l.timestamp}</td>
+      <td class="td-ip">${l.ip}</td>
+      <td class="td-user">${l.user}</td>
+      <td class="${l.status === 'failed' ? 'td-fail' : 'td-ok'}">${l.status.toUpperCase()}</td>
+      <td>${l.external ? '<span class="td-ext">external</span>' : '<span style="color:var(--faint);font-size:10px">internal</span>'}</td>
+    </tr>`).join('');
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function clearAll() {
+  allLogs = [];
+  document.getElementById('pasteArea').value = '';
+  document.getElementById('fileInput').value = '';
+  document.getElementById('upload-section').style.display = 'block';
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('clearBtn').style.display = 'none';
+  document.getElementById('statusDot').className = 'dot';
+  document.getElementById('statusText').textContent = 'Ready';
+  hideError();
+}
+
+function setLoading(on) {
+  const btn = document.getElementById('analyzeBtn');
+  btn.disabled = on;
+  if (on) {
+    document.getElementById('statusDot').className = 'dot';
+    document.getElementById('statusText').textContent = 'Analyzing…';
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+function hideError() {
+  document.getElementById('errorMsg').style.display = 'none';
+}
+
+// Live clock
+function tick() {
+  const now = new Date();
+  document.getElementById('footerTime').textContent = now.toLocaleTimeString();
+}
+tick(); setInterval(tick, 1000);
+</script>
+</body>
+</html>
